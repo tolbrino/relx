@@ -125,12 +125,13 @@ ping(Config) ->
                            {config, ConfigFile}], ["release"]),
 
     %% now start/stop the release to make sure the extended script is working
-    {ok, _} = sh(filename:join([OutputDir, "foo", "bin", "foo start"])),
+    {ok, Out} = sh(filename:join([OutputDir, "foo", "bin", binary("foo") ++ " start"])),
+    ct:pal("OUT: ~p", [Out]),
     timer:sleep(?SLEEP_TIME),
     {ok, "pong"} = sh(filename:join([OutputDir, "foo", "bin", "foo ping"])),
-    {ok, _} = sh(filename:join([OutputDir, "foo", "bin", "foo stop"])),
+    {ok, _} = sh(filename:join([OutputDir, "foo", "bin", binary("foo") ++ " stop"])),
     %% a ping should fail after stopping a node
-    {error, 1, _} = sh(filename:join([OutputDir, "foo", "bin", "foo ping"])).
+    {error, 1, _} = sh(filename:join([OutputDir, "foo", "bin", binary("foo") ++ " ping"])).
 
 shortname_ping(Config) ->
     LibDir1 = proplists:get_value(lib1, Config),
@@ -1945,7 +1946,13 @@ sh(Command, Env) ->
     sh(Command, Env, get_cwd()).
 
 sh(Command, Env, Dir) ->
-    Port = open_port({spawn, lists:flatten(Command)},
+    Cmd = case os:type() of
+        {win32, _} ->
+			  "cmd /c " ++ lists:flatten(Command);
+		  _ ->
+			  lists:flatten(Command)
+	  end,
+    Port = open_port({spawn, Cmd},
                      [{cd, Dir},
                       {env, Env},
                       exit_status,
@@ -1974,3 +1981,11 @@ sh_loop(Port, Acc) ->
 get_cwd() ->
     {ok, Dir} = file:get_cwd(),
     Dir.
+
+binary(Cmd) ->
+    case os:type() of
+        {win32, _} ->
+		 Cmd ++ ".cmd";
+	 _ ->
+		 Cmd
+    end.	 
